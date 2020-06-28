@@ -1,41 +1,75 @@
-#![no_main]
 #![no_std]
+#![no_main]
 
-mod vec;
-
-use core::fmt::Write;
+use panic_semihosting as _;
 
 use cortex_m_rt::entry;
-use panic_halt as _;
-use stm32f4xx_hal as hal;
+use stm32f4xx_hal::otg_fs::{UsbBus, USB};
+use stm32f4xx_hal::{prelude::*, stm32};
+use usb_device::prelude::*;
 
-use hal::{block, prelude::*, serial, stm32};
-use vec::Vec;
+static mut EP_MEMORY: [u32; 1024] = [0; 1024];
 
 #[entry]
 fn main() -> ! {
     let dp = stm32::Peripherals::take().unwrap();
+
     let rcc = dp.RCC.constrain();
-    let clocks = rcc.cfgr.freeze();
+
+    rcc.cfgr
+        .use_hse(25.mhz())
+        .sysclk(48.mhz())
+        .require_pll48clk()
+        .freeze();
+
     let gpioa = dp.GPIOA.split();
 
-    let tx = gpioa.pa2.into_alternate_af7();
-    let rx = gpioa.pa3.into_alternate_af7();
+    let usb = USB {
+        usb_global: dp.OTG_FS_GLOBAL,
+        usb_device: dp.OTG_FS_DEVICE,
+        usb_pwrclk: dp.OTG_FS_PWRCLK,
+        pin_dm: gpioa.pa11.into_alternate_af10(),
+        pin_dp: gpioa.pa12.into_alternate_af10(),
+    };
 
-    let config = serial::config::Config::default().baudrate(115_200.bps());
-    let usart = serial::Serial::usart2(dp.USART2, (tx, rx), config, clocks).unwrap();
+    let usb_bus = UsbBus::new(usb, unsafe { &mut EP_MEMORY });
 
-    let (mut tx, mut rx) = usart.split();
+    let mut serial = usbd_serial::SerialPort::new(&usb_bus);
 
-    let mut _buf = [0; 1024];
-    let mut buf = Vec::new(&mut _buf);
+    let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x16c0, 0x27dd))
+        .manufacturer("Fake company")
+        .product("Serial port")
+        .serial_number("TEST")
+        .device_class(usbd_serial::USB_CLASS_CDC)
+        .build();
+
     loop {
-        let byte = block!(rx.read()).unwrap();
-        buf.push(byte);
-        tx.write(byte).unwrap();
-        if byte == b'\n' {
-            writeln!(tx, "echo: {}", buf.as_str().unwrap()).unwrap();
-            buf.clear();
+        if !usb_dev.poll(&mut [&mut serial]) {
+            continue;
+        }
+
+        let mut buf = [0u8; 64];
+
+        match serial.read(&mut buf) {
+            Ok(count) if count > 0 => {
+                // Echo back in upper case
+                for c in buf[0..count].iter_mut() {
+                    if 0x61 <= *c && *c <= 0x7a {
+                        *c &= !0x20;
+                    }
+                }
+
+                let mut write_offset = 0;
+                while write_offset < count {
+                    match serial.write(&buf[write_offset..count]) {
+                        Ok(len) if len > 0 => {
+                            write_offset += len;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
         }
     }
 }
