@@ -1,9 +1,7 @@
-#![no_main]
 #![no_std]
+#![no_main]
 
-mod vec;
-
-use core::fmt::Write;
+mod usb_hid;
 
 use cortex_m_rt::entry;
 use panic_semihosting as _;
