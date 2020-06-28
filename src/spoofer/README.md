@@ -12,11 +12,10 @@ openocd -f interface/stlink-v2.cfg -f target/stm32f4x.cfg
 ```
 
 Run the following to build this crate and open GDB where it will automatically
-run the following for you (in `.gdbinit`).
+connect to OpenOCD and load the binary (see `openocd.gdb`).
 
 ```
-(gdb) target remote :3333
-(gdb) load
+cargo run
 ```
 
 You can then debug the code using GDB.
