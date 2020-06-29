@@ -1,11 +1,11 @@
 #![no_std]
 #![no_main]
 
-use panic_semihosting as _;
+extern crate panic_semihosting;
 
 use cortex_m_rt::entry;
-use stm32f4xx_hal::otg_fs::{UsbBus, USB};
 use stm32f4xx_hal::{prelude::*, stm32};
+use stm32f4xx_hal::otg_fs::{USB, UsbBus};
 use usb_device::prelude::*;
 
 static mut EP_MEMORY: [u32; 1024] = [0; 1024];
@@ -16,9 +16,11 @@ fn main() -> ! {
 
     let rcc = dp.RCC.constrain();
 
-    rcc.cfgr
-        .use_hse(25.mhz())
+    let _clocks = rcc
+        .cfgr
+        .use_hse(8.mhz())
         .sysclk(48.mhz())
+        .pclk1(24.mhz())
         .require_pll48clk()
         .freeze();
 
@@ -36,10 +38,9 @@ fn main() -> ! {
 
     let mut serial = usbd_serial::SerialPort::new(&usb_bus);
 
-    let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x16c0, 0x27dd))
-        .manufacturer("Fake company")
-        .product("Serial port")
-        .serial_number("TEST")
+    let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x0403, 0x6001))
+        .manufacturer("Future Technology Devices International, Ltd")
+        .product("FT232 USB-Serial (UART) IC")
         .device_class(usbd_serial::USB_CLASS_CDC)
         .build();
 
