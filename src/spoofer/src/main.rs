@@ -1,14 +1,13 @@
 #![no_std]
 #![no_main]
 
-extern crate panic_semihosting;
+mod usb_hid;
 
 use cortex_m_rt::entry;
-use stm32f4xx_hal::{prelude::*, stm32};
-use stm32f4xx_hal::otg_fs::{USB, UsbBus};
-use usb_device::prelude::*;
-
-static mut EP_MEMORY: [u32; 1024] = [0; 1024];
+use panic_semihosting as _;
+use stm32f4xx_hal::prelude::*;
+use stm32f4xx_hal::stm32;
+use stm32f4xx_hal::otg_fs::USB;
 
 #[entry]
 fn main() -> ! {
@@ -26,7 +25,7 @@ fn main() -> ! {
 
     let gpioa = dp.GPIOA.split();
 
-    let usb = USB {
+    let usb_peripherals = USB {
         usb_global: dp.OTG_FS_GLOBAL,
         usb_device: dp.OTG_FS_DEVICE,
         usb_pwrclk: dp.OTG_FS_PWRCLK,
@@ -34,43 +33,7 @@ fn main() -> ! {
         pin_dp: gpioa.pa12.into_alternate_af10(),
     };
 
-    let usb_bus = UsbBus::new(usb, unsafe { &mut EP_MEMORY });
+    let usb = usb_hid::Usb::new(usb_peripherals);
 
-    let mut serial = usbd_serial::SerialPort::new(&usb_bus);
-
-    let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x0403, 0x6001))
-        .manufacturer("Future Technology Devices International, Ltd")
-        .product("FT232 USB-Serial (UART) IC")
-        .device_class(usbd_serial::USB_CLASS_CDC)
-        .build();
-
-    loop {
-        if !usb_dev.poll(&mut [&mut serial]) {
-            continue;
-        }
-
-        let mut buf = [0u8; 64];
-
-        match serial.read(&mut buf) {
-            Ok(count) if count > 0 => {
-                // Echo back in upper case
-                for c in buf[0..count].iter_mut() {
-                    if 0x61 <= *c && *c <= 0x7a {
-                        *c &= !0x20;
-                    }
-                }
-
-                let mut write_offset = 0;
-                while write_offset < count {
-                    match serial.write(&buf[write_offset..count]) {
-                        Ok(len) if len > 0 => {
-                            write_offset += len;
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
+    loop {}
 }
