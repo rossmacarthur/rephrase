@@ -1,22 +1,17 @@
-//! PlayStation Dualshock 4 controller.
+//! Sony PlayStation DualShock 4 controller.
+//!
+//! Useful links:
+//! - https://www.psdevwiki.com/ps4/DS4-USB
+//! - https://github.com/chrippa/ds4drv/blob/be7327fc3f5abb8717815f2a1a2ad3d335535d8a/ds4drv/device.py#L150-L211
+//! - https://github.com/JibbSmart/JoyShockLibrary/blob/959d41b7339421d5a135d43a112c27138e33f2ff/JoyShockLibrary/InputHelpers.cpp
 
-use std::convert::TryInto;
+use core::convert::TryInto
 
-use crate::model::*;
+use crate::*;
 
 /////////////////////////////////////////////////////////////////////////
-// Utility traits
+// Utilities
 /////////////////////////////////////////////////////////////////////////
-
-trait IsBitSet {
-    fn is_bit_set(&self, bit: u8) -> bool;
-}
-
-impl IsBitSet for u8 {
-    fn is_bit_set(&self, bit: u8) -> bool {
-        (self & (0b1 << bit)) > 0
-    }
-}
 
 trait FromLeSlice {
     fn from_le_slice(bytes: &[u8]) -> Self;
@@ -29,10 +24,10 @@ impl FromLeSlice for i16 {
 }
 
 /////////////////////////////////////////////////////////////////////////
-// Report implementation
+// Definitions
 /////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[cfg_attr(feature = "std", derive(Debug))]
 pub struct Report {
     id: u8,
     counter: u8,
@@ -41,10 +36,6 @@ pub struct Report {
 
 impl Report {
     pub fn from_bytes(buf: &[u8]) -> Self {
-        // https://www.psdevwiki.com/ps4/DS4-USB
-        // https://github.com/chrippa/ds4drv/blob/be7327fc3f5abb8717815f2a1a2ad3d335535d8a/ds4drv/device.py#L150-L211
-        // https://github.com/JibbSmart/JoyShockLibrary/blob/959d41b7339421d5a135d43a112c27138e33f2ff/JoyShockLibrary/InputHelpers.cpp
-
         let id = buf[0];
         let mut buttons = Buttons::empty();
 
@@ -75,17 +66,17 @@ impl Report {
             (6, 1, Buttons::R1),
             (6, 2, Buttons::L2),
             (6, 3, Buttons::R2),
-            (6, 4, Buttons::SHARE),
-            (6, 5, Buttons::OPTIONS),
+            (6, 4, Buttons::MINUS),
+            (6, 5, Buttons::PLUS),
             (6, 6, Buttons::L3),
             (6, 7, Buttons::R3),
             // Byte 7
-            (7, 0, Buttons::PS),
-            (7, 1, Buttons::TPAD),
+            (7, 0, Buttons::HOME),
+            (7, 1, Buttons::CAPTURE),
         ];
 
         for (byte, bit, button) in bit_flags {
-            // simply check's if the bit `bit` is set
+            // simply checks if the bit `bit` is set in `byte`
             if (buf[*byte] & (0b1 << bit)) > 0 {
                 buttons |= *button;
             }

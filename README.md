@@ -1,6 +1,6 @@
 # rephrase
 
-Rephrase translates PS4 DualShock 4 controller commands into a Nintendo Joycon
+Rephrase translates Sony DualShock 4 controller commands into a Nintendo Joycon
 controller commands.
 
 ## Why?
@@ -9,9 +9,12 @@ I have a DS4 controller and I want it to work with my Nintendo Switch console.
 
 ## Architecture
 
-This project contains two main Rust crates that implement this translation:
+This project contains three main Rust crates that implement this translation:
 
-- [reader](src/reader): Reads DS4 input over USB (and in the future Bluetooth).
+- [gamepad](src/gamepad): Defines a generic gamepad interface for use in the
+  below crates.
+- [reader](src/reader): Reads Sony DualShock 4 input over USB (and in the future
+  Bluetooth).
 - [spoofer](src/spoofer): Turns a STM32F4 Discovery microcontroller into a
   Nintendo Joycon emulator using the micro USB port.
 
