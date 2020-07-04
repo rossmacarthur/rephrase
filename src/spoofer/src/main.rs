@@ -1,22 +1,24 @@
 #![no_main]
 #![no_std]
 
+mod usb_hid;
 mod vec;
-
-use core::fmt::Write;
 
 use cortex_m_rt::entry;
 use panic_semihosting as _;
-use stm32f4xx_hal::nb;
 use stm32f4xx_hal::otg_fs::{UsbBus, USB};
 use stm32f4xx_hal::prelude::*;
-use stm32f4xx_hal::serial;
-use stm32f4xx_hal::stm32;
-use usb_device::prelude::*;
+use stm32f4xx_hal::stm32::{self, interrupt};
+use stm32f4xx_hal::{block, serial};
 
 use vec::Vec;
 
 static mut EP_MEMORY: [u32; 1024] = [0; 1024];
+
+#[interrupt]
+fn OTG_FS() {
+    usb_hid::interrupt();
+}
 
 #[entry]
 fn main() -> ! {
@@ -42,14 +44,11 @@ fn main() -> ! {
         pin_dm: gpioa.pa11.into_alternate_af10(),
         pin_dp: gpioa.pa12.into_alternate_af10(),
     };
-    let usb_bus = UsbBus::new(usb, unsafe { &mut EP_MEMORY });
-    let mut usb_serial = usbd_serial::SerialPort::new(&usb_bus);
-    let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x057e, 0x2009))
-        .manufacturer("Nintendo Co., Ltd.")
-        .product("Pro Controller")
-        .serial_number("000000000001")
-        .device_class(usbd_serial::USB_CLASS_CDC)
-        .build();
+    let usb_alloc = UsbBus::new(usb, unsafe { &mut EP_MEMORY });
+    usb_hid::init(usb_alloc);
+    unsafe {
+        stm32::NVIC::unmask(stm32::Interrupt::OTG_FS);
+    }
 
     // UART stuff
     let tx = gpioa.pa2.into_alternate_af7();
@@ -65,19 +64,14 @@ fn main() -> ! {
 
     // Loop forever
     loop {
-        usb_dev.poll(&mut [&mut usb_serial]);
-
-        match rx.read() {
-            Err(nb::Error::WouldBlock) => {}
-            result => {
-                let byte = result.unwrap();
-                buf.push(byte);
-                tx.write(byte).unwrap();
-                if byte == b'\n' {
-                    writeln!(tx, "echo: {}", buf.as_str().unwrap()).unwrap();
-                    buf.clear();
-                }
+        let byte = block!(rx.read()).unwrap();
+        buf.push(byte);
+        tx.write(byte).unwrap(); // gives feedback to the sender
+        if byte == b'\n' {
+            if buf.as_str().unwrap() == "send\n" {
+                usb_hid::send();
             }
+            buf.clear();
         }
     }
 }
