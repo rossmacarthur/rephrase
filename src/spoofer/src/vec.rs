@@ -28,7 +28,7 @@ impl<'s, T> Vec<'s, T> {
 }
 
 impl<'s> Vec<'s, u8> {
-    pub fn as_str(&self) -> Result<&str, str::Utf8Error>{
+    pub fn as_str(&self) -> Result<&str, str::Utf8Error> {
         str::from_utf8(&self.inner[..self.len])
     }
 }
