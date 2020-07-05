@@ -11,12 +11,12 @@ I have a DS4 controller and I want it to work with my Nintendo Switch console.
 
 This project contains three main Rust crates that implement this translation:
 
-- [gamepad](src/gamepad): Defines a generic gamepad interface for use in the
-  below crates.
-- [reader](src/reader): Reads Sony DualShock 4 input over USB (and in the future
+- [gamepad](gamepad): Defines a generic gamepad interface for use in the below
+  crates.
+- [reader](reader): Reads Sony DualShock 4 input over USB (and in the future
   Bluetooth).
-- [spoofer](src/spoofer): Turns a STM32F4 Discovery microcontroller into a
-  Nintendo Joycon emulator using the micro USB port.
+- [spoofer](spoofer): Turns a STM32F4 Discovery microcontroller into a Nintendo
+  Joycon emulator using the micro USB port.
 
 ## License
 
