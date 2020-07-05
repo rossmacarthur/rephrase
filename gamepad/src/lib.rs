@@ -95,6 +95,17 @@ pub struct State {
     orientation: Orientation,
 }
 
+/// A generic controller HID `Report`.
+#[cfg_attr(feature = "std", derive(Debug))]
+pub struct Report {
+    /// Report identifier.
+    id: u8,
+    /// Counts up 1 per report.
+    counter: u8,
+    /// The state of the controller.
+    state: State,
+}
+
 /////////////////////////////////////////////////////////////////////////
 // Implementations
 /////////////////////////////////////////////////////////////////////////
