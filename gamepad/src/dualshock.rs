@@ -22,8 +22,8 @@ impl FromLeSlice for i16 {
 /// Parses a DualShock 4 report into a generic `Report` struct.
 pub fn from_bytes(buf: &[u8]) -> Report {
     assert_eq!(buf.len(), 64, "buffer should be 64 bytes");
+    assert_eq!(buf[0], 1, "report id should be 1");
 
-    let id = buf[0];
     let mut buttons = Buttons::empty();
 
     let left_stick = Stick::new(buf[1], buf[2]);
@@ -69,7 +69,7 @@ pub fn from_bytes(buf: &[u8]) -> Report {
         }
     }
 
-    let counter = buf[7] >> 2;
+    let counter = Some(buf[7] >> 2);
     let left_trigger = buf[8];
     let right_trigger = buf[9];
 
@@ -95,5 +95,5 @@ pub fn from_bytes(buf: &[u8]) -> Report {
         orientation,
     };
 
-    Report { id, counter, state }
+    Report { counter, state }
 }

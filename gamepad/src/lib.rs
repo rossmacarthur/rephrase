@@ -13,6 +13,7 @@ use bitflags::bitflags;
 
 bitflags! {
     /// Represents the set of currently pushed buttons.
+    #[derive(Default)]
     pub struct Buttons: u32 {
         /// D-pad up
         const UP = 0x00001;
@@ -61,6 +62,7 @@ pub struct Stick {
 }
 
 /// Accelerometer state. X, Y, and Z axis in g (g-force).
+#[derive(Default)]
 #[cfg_attr(feature = "std", derive(Debug))]
 pub struct Acceleration {
     x: i16,
@@ -69,6 +71,7 @@ pub struct Acceleration {
 }
 
 /// Gyroscope state. Angular velocity X, Y, and Z axis in degrees per second.
+#[derive(Default)]
 #[cfg_attr(feature = "std", derive(Debug))]
 pub struct Orientation {
     x: i16,
@@ -96,12 +99,11 @@ pub struct State {
 }
 
 /// A generic controller HID `Report`.
+#[derive(Default)]
 #[cfg_attr(feature = "std", derive(Debug))]
 pub struct Report {
-    /// Report identifier.
-    id: u8,
     /// Counts up 1 per report.
-    counter: u8,
+    counter: Option<u8>,
     /// The state of the controller.
     state: State,
 }
@@ -109,6 +111,12 @@ pub struct Report {
 /////////////////////////////////////////////////////////////////////////
 // Implementations
 /////////////////////////////////////////////////////////////////////////
+
+impl Default for Stick {
+    fn default() -> Self {
+        Self { x: 128, y: 128 }
+    }
+}
 
 impl Stick {
     pub fn new(x: u8, y: u8) -> Self {
@@ -125,5 +133,25 @@ impl Acceleration {
 impl Orientation {
     pub fn new(x: i16, y: i16, z: i16) -> Self {
         Self { x, y, z }
+    }
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            buttons: Default::default(),
+            left_stick: Default::default(),
+            right_stick: Default::default(),
+            left_trigger: 128,
+            right_trigger: 128,
+            acceleration: Default::default(),
+            orientation: Default::default(),
+        }
+    }
+}
+
+impl Report {
+    pub fn counter(&self) -> Option<u8> {
+        self.counter
     }
 }

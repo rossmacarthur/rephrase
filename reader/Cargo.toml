@@ -8,4 +8,11 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.31"
 bitflags = "1.2.1"
+usb = { package = "rusb", version = "0.6.0" }
+
+[dependencies.gamepad]
+package = "rephrase-gamepad"
+path = "../gamepad"
+features = ["std", "dualshock"]
