@@ -4,7 +4,12 @@
 mod usb_hid;
 mod vec;
 
+use core::cell::RefCell;
+use core::fmt::{self, Write};
+
+use cortex_m::interrupt::{free, CriticalSection, Mutex};
 use cortex_m_rt::entry;
+use lazy_static::lazy_static;
 use panic_semihosting as _;
 use stm32f4xx_hal::otg_fs::{UsbBus, USB};
 use stm32f4xx_hal::prelude::*;
@@ -14,6 +19,14 @@ use stm32f4xx_hal::{block, serial};
 use vec::Vec;
 
 static mut EP_MEMORY: [u32; 1024] = [0; 1024];
+static UART_TX: Mutex<RefCell<Option<serial::Tx<stm32::USART2>>>> = Mutex::new(RefCell::new(None));
+
+fn send_over_uart(cs: &CriticalSection, args: fmt::Arguments<'_>) {
+    let mut borrow = crate::UART_TX.borrow(cs).borrow_mut();
+    if let Some(tx) = borrow.as_mut() {
+        tx.write_fmt(args).unwrap()
+    }
+}
 
 #[interrupt]
 fn OTG_FS() {
@@ -61,17 +74,39 @@ fn main() -> ! {
 
     let mut _buf = [0; 1024];
     let mut buf = Vec::new(&mut _buf);
-
+    writeln!(tx, "=== spoofer started ===").unwrap();
+    free(move |cs| {
+        UART_TX.borrow(&cs).replace(Some(tx));
+    });
     // Loop forever
-    loop {
-        let byte = block!(rx.read()).unwrap();
-        buf.push(byte);
-        tx.write(byte).unwrap(); // gives feedback to the sender
-        if byte == b'\n' {
-            if buf.as_str().unwrap() == "send\n" {
-                usb_hid::send();
-            }
-            buf.clear();
+    // usb_hid::send();
+
+    fn send_report(counter: u8) {
+        let mut report = [0; 64];
+
+        let header = [0x19, 0x01, 0x03, 0x07, 0x00, 0x00, 0x92, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01];
+        for (index, byte) in header.iter().enumerate() {
+            report[index] = *byte;
         }
+
+        report[13] = 0x30;
+        report[14] = counter;
+        report[15] = 0x81;
+
+        report[16] = 0x40;
+        report[17] = 0x00;
+        report[18] = 0x40;
+
+        usb_hid::send(&report);
+    }
+
+    let mut counter = 0;
+    for _ in 0..40 {
+        counter += 1;
+        send_report(counter);
+    }
+
+    loop {
+        send_report(counter);
     }
 }
