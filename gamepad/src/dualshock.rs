@@ -85,7 +85,7 @@ pub fn from_bytes(buf: &[u8]) -> Report {
         i16::from_le_slice(&buf[23..=24]),
     );
 
-    let state = State {
+    let status = Status {
         buttons,
         left_stick,
         right_stick,
@@ -95,5 +95,5 @@ pub fn from_bytes(buf: &[u8]) -> Report {
         orientation,
     };
 
-    Report { counter, state }
+    Report { counter, status }
 }

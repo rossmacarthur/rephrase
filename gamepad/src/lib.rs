@@ -55,15 +55,14 @@ bitflags! {
 }
 
 /// Joy stick state.
-#[cfg_attr(feature = "std", derive(Debug))]
+#[derive(Debug)]
 pub struct Stick {
     x: u8,
     y: u8,
 }
 
 /// Accelerometer state. X, Y, and Z axis in g (g-force).
-#[derive(Default)]
-#[cfg_attr(feature = "std", derive(Debug))]
+#[derive(Debug, Default)]
 pub struct Acceleration {
     x: i16,
     y: i16,
@@ -71,8 +70,7 @@ pub struct Acceleration {
 }
 
 /// Gyroscope state. Angular velocity X, Y, and Z axis in degrees per second.
-#[derive(Default)]
-#[cfg_attr(feature = "std", derive(Debug))]
+#[derive(Debug, Default)]
 pub struct Orientation {
     x: i16,
     y: i16,
@@ -80,8 +78,8 @@ pub struct Orientation {
 }
 
 /// The current state.
-#[cfg_attr(feature = "std", derive(Debug))]
-pub struct State {
+#[derive(Debug)]
+pub struct Status {
     /// The states of all the buttons.
     buttons: Buttons,
     /// The right joy stick analog values.
@@ -99,13 +97,12 @@ pub struct State {
 }
 
 /// A generic controller HID `Report`.
-#[derive(Default)]
-#[cfg_attr(feature = "std", derive(Debug))]
+#[derive(Debug, Default)]
 pub struct Report {
     /// Counts up 1 per report.
     counter: Option<u8>,
     /// The state of the controller.
-    state: State,
+    status: Status,
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -136,7 +133,7 @@ impl Orientation {
     }
 }
 
-impl Default for State {
+impl Default for Status {
     fn default() -> Self {
         Self {
             buttons: Default::default(),
