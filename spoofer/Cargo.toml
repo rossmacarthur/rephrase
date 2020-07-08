@@ -10,6 +10,7 @@ publish = false
 [dependencies]
 cortex-m = "0.6.2"
 cortex-m-rt = "0.6.12"
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 panic-semihosting = "0.5.3"
 stm32f4xx-hal = { version = "0.8.3", features = ["rt", "stm32f407", "usb_fs"] }
 usb-device = "0.2.5"

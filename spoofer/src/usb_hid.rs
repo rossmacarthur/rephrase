@@ -10,6 +10,7 @@
 use core::cell::RefCell;
 
 use cortex_m::interrupt::{free, Mutex};
+use stm32f4xx_hal::block;
 use stm32f4xx_hal::otg_fs::UsbBusType;
 use usb_device::class_prelude::*;
 use usb_device::prelude::*;
@@ -119,7 +120,9 @@ pub struct Hid {
     /// The USB interface number.
     interface_number: InterfaceNumber,
     /// Traffic from the device to the host.
-    endpoint: EndpointIn<'static, UsbBusType>,
+    endpoint_in: EndpointIn<'static, UsbBusType>,
+    /// Traffic from the host to the device.
+    endpoint_out: EndpointOut<'static, UsbBusType>,
 }
 
 /// Represents the USB port on the microcontroller.
@@ -154,7 +157,8 @@ pub fn init(usb_alloc: UsbBusAllocator<UsbBusType>) {
         };
         let hid = Hid {
             interface_number: usb_alloc.interface(),
-            endpoint: usb_alloc.interrupt(64, 8),
+            endpoint_in: usb_alloc.bulk(64),
+            endpoint_out: usb_alloc.bulk(64),
         };
         let device = UsbDeviceBuilder::new(usb_alloc, UsbVidPid(0x057e, 0x2009))
             .device_class(0x00)
@@ -184,18 +188,20 @@ where
             0x00, // bInterfaceSubClass
             0x00, // bInterfaceProtocol
         )?;
-        #[rustfmt::skip]
         writer.write(
             0x21, // bDescriptorType, Human Interface Device (HID)
             &[
-                0x11, 0x01, // bcdHID, Version 1.11
+                0x11,
+                0x01, // bcdHID, Version 1.11
                 0x00, // bCountryCode
                 0x01, // bNumDescriptors
                 0x22, // bDescriptorType, HID Report
-                HID_DESCRIPTOR.len() as u8, (HID_DESCRIPTOR.len() >> 8) as u8, // wDescriptorLength
+                HID_DESCRIPTOR.len() as u8,
+                (HID_DESCRIPTOR.len() >> 8) as u8, // wDescriptorLength
             ],
         )?;
-        writer.endpoint(&self.endpoint)?;
+        writer.endpoint(&self.endpoint_in)?;
+        writer.endpoint(&self.endpoint_out)?;
         Ok(())
     }
 
@@ -221,14 +227,45 @@ where
             }
         }
     }
+
+    fn endpoint_out(&mut self, addr: EndpointAddress) {
+        let mut buf = [0; 64];
+        let len = self.endpoint_out.read(&mut buf).unwrap();
+        free(move |cs| {
+            crate::send_over_uart(&cs, core::format_args!("recv: {:02x?}\n", &buf[..len]));
+        });
+        if buf.len() >= 2 && buf[0] == 0x80 && buf[1] == 0x01 {
+            let resp = [0x81, 0x01, 0x00, 0x02, 0x57, 0x30, 0xea, 0x8a, 0xbb, 0x7c];
+            self.endpoint_in.write(&resp).unwrap();
+            free(move |cs| {
+                crate::send_over_uart(&cs, core::format_args!("sent: {:02x?}\n", resp.as_ref()));
+            });
+        } else if buf.len() >= 2 && buf[0] == 0x80 && buf[1] == 0x02 {
+            let resp = [0x81, 0x02];
+            self.endpoint_in.write(&resp).unwrap();
+            free(move |cs| {
+                crate::send_over_uart(&cs, core::format_args!("sent: {:02x?}\n", resp.as_ref()));
+            });
+
+        }
+        // } else if buf.len() > 10 {
+        //     let cmd = &buf[10..];
+        //     let resp = [0x80, cmd[0], 0x03];
+        //     self.endpoint_in.write(&resp).unwrap();
+        //     free(move |cs| {
+        //         crate::send_over_uart(&cs, core::format_args!("sent: {:?}\n", resp.as_ref()));
+        //     });
+        // }
+    }
+
 }
 
-impl Hid {
-    /// Send a USB HID report.
-    pub fn send_report(&mut self, report: Report) -> usb_device::Result<usize> {
-        self.endpoint.write(report.as_ref())
-    }
-}
+// impl Hid {
+//     /// Send a USB HID report.
+//     pub fn send_report(&mut self, report: Report) -> usb_device::Result<usize> {
+//         self.endpoint_in.write(report.as_ref())
+//     }
+// }
 
 pub fn interrupt() {
     free(move |cs| {
@@ -238,10 +275,12 @@ pub fn interrupt() {
     });
 }
 
-pub fn send() {
+pub fn send(data: &[u8]) {
     free(move |cs| {
         let mut borrow = USB.borrow(&cs).borrow_mut();
         let usb = &mut borrow.as_mut().unwrap();
-        usb.hid.send_report(Report::new()).ok();
+        if let Ok(_) = usb.hid.endpoint_in.write(&data) {
+            crate::send_over_uart(&cs, core::format_args!("sent*: {:02x?}\n", data.as_ref()));
+        }
     });
 }
