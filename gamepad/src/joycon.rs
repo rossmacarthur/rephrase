@@ -5,6 +5,7 @@ use crate::*;
 /// Convert the `Report` into Joycon specific bytes.
 pub fn into_input_report_bytes(report: Report) -> [u8; 13] {
     let Report {
+        counter,
         status:
             Status {
                 buttons,
@@ -22,7 +23,7 @@ pub fn into_input_report_bytes(report: Report) -> [u8; 13] {
     buf[2] = 0x80 & 0x01; // high nibble battery, low nibble connection info
 
     // Digital buttons
-    let bit_flags: [(usize, u8, Buttons); 14] = [
+    let bit_flags: [(usize, u8, Buttons); 12] = [
         (3, 0x01, Buttons::WEST),
         (3, 0x02, Buttons::NORTH),
         (3, 0x04, Buttons::SOUTH),

@@ -10,9 +10,10 @@ publish = false
 [dependencies]
 anyhow = "1.0.31"
 bitflags = "1.2.1"
+serial = "0.4.0"
 usb = { package = "rusb", version = "0.6.0" }
 
 [dependencies.gamepad]
 package = "rephrase-gamepad"
 path = "../gamepad"
-features = ["std", "dualshock"]
+features = ["std", "dualshock", "joycon"]

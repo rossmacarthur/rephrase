@@ -4,6 +4,10 @@
 mod usb_hid;
 mod vec;
 
+use core::cell::RefCell;
+use core::fmt::{self, Write};
+
+use cortex_m::interrupt::{free, CriticalSection, Mutex};
 use cortex_m_rt::entry;
 use panic_semihosting as _;
 use stm32f4xx_hal::otg_fs::{UsbBus, USB};
@@ -14,6 +18,14 @@ use stm32f4xx_hal::{block, serial};
 use vec::Vec;
 
 static mut EP_MEMORY: [u32; 1024] = [0; 1024];
+static UART_TX: Mutex<RefCell<Option<serial::Tx<stm32::USART2>>>> = Mutex::new(RefCell::new(None));
+
+fn send_over_uart(cs: &CriticalSection, args: fmt::Arguments<'_>) {
+    let mut borrow = crate::UART_TX.borrow(cs).borrow_mut();
+    if let Some(tx) = borrow.as_mut() {
+        tx.write_fmt(args).unwrap()
+    }
+}
 
 #[interrupt]
 fn OTG_FS() {
@@ -61,16 +73,16 @@ fn main() -> ! {
 
     let mut _buf = [0; 1024];
     let mut buf = Vec::new(&mut _buf);
+    writeln!(tx, "=== spoofer started ===").unwrap();
+    free(move |cs| {
+        UART_TX.borrow(&cs).replace(Some(tx));
+    });
 
-    // Loop forever
     loop {
         let byte = block!(rx.read()).unwrap();
         buf.push(byte);
-        tx.write(byte).unwrap(); // gives feedback to the sender
         if byte == b'\n' {
-            if buf.as_str().unwrap() == "send\n" {
-                usb_hid::send();
-            }
+            usb_hid::send(buf.as_ref());
             buf.clear();
         }
     }

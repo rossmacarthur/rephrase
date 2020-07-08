@@ -1,7 +1,9 @@
+use std::io::prelude::*;
+use std::thread;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
-use gamepad::dualshock;
+use gamepad::{dualshock, joycon};
 
 type Device = usb::Device<usb::GlobalContext>;
 type DeviceHandle = usb::DeviceHandle<usb::GlobalContext>;
@@ -33,6 +35,7 @@ fn read(handle: &DeviceHandle) -> Result<Option<Vec<u8>>> {
 }
 
 fn main() -> Result<()> {
+    // USB
     let device = get_first_controller()?;
     println!("Found DualShock 4 controller:\n  {:?}\n", device);
     let mut handle = device.open().context("failed to open device")?;
@@ -41,13 +44,14 @@ fn main() -> Result<()> {
         .claim_interface(USB_INTERFACE)
         .context("failed to claim interface")?;
 
-    let mut prev = dualshock::from_bytes(&read(&handle)?.unwrap());
+    // UART
+    let mut port = serial::open("/dev/ttyUSB0").context("failed to open serial port")?;
+
     loop {
+        thread::sleep(Duration::from_millis(100));
         let report = dualshock::from_bytes(&read(&handle)?.unwrap());
-        if prev.counter() != report.counter() {
-            print!("\x1B[2J\x1B[1;1H");
-            println!("{:#?}", report);
-        }
-        prev = report;
+        let mut buf = joycon::into_input_report_bytes(report).to_vec();
+        buf.push(b'\n');
+        port.write(&buf)?;
     }
 }

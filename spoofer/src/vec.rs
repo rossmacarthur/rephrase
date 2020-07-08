@@ -27,6 +27,12 @@ impl<'s, T> Vec<'s, T> {
     }
 }
 
+impl<'s> AsRef<[u8]> for Vec<'s, u8> {
+    fn as_ref(&self) -> &[u8] {
+        &self.inner[..self.len]
+    }
+}
+
 impl<'s> Vec<'s, u8> {
     pub fn as_str(&self) -> Result<&str, str::Utf8Error> {
         str::from_utf8(&self.inner[..self.len])
