@@ -110,11 +110,6 @@ const HID_DESCRIPTOR: &[u8] = &[
     0xC0,                         // End Collection
 ];
 
-// A fake USB HID report.
-pub struct Report([u8; 64]);
-
-const REPORT: Report = Report::new();
-
 /// Represents a USB human interface device.
 pub struct Hid {
     /// The USB interface number.
@@ -135,19 +130,6 @@ pub struct Usb {
 
 static mut USB_ALLOC: Option<UsbBusAllocator<UsbBusType>> = None;
 static USB: Mutex<RefCell<Option<Usb>>> = Mutex::new(RefCell::new(None));
-
-impl Report {
-    /// Create a new empty `Report`.
-    const fn new() -> Self {
-        Self([0; 64])
-    }
-}
-
-impl AsRef<[u8]> for Report {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
 
 pub fn init(usb_alloc: UsbBusAllocator<UsbBusType>) {
     free(move |cs| {
@@ -231,41 +213,17 @@ where
     fn endpoint_out(&mut self, addr: EndpointAddress) {
         let mut buf = [0; 64];
         let len = self.endpoint_out.read(&mut buf).unwrap();
-        free(move |cs| {
-            crate::send_over_uart(&cs, core::format_args!("recv: {:02x?}\n", &buf[..len]));
+        free(|cs| {
+            crate::send_over_uart(&cs, core::format_args!("switch:  {:02x?}\n", &buf[..len]));
         });
-        if buf.len() >= 2 && buf[0] == 0x80 && buf[1] == 0x01 {
-            let resp = [0x81, 0x01, 0x00, 0x02, 0x57, 0x30, 0xea, 0x8a, 0xbb, 0x7c];
-            self.endpoint_in.write(&resp).unwrap();
-            free(move |cs| {
-                crate::send_over_uart(&cs, core::format_args!("sent: {:02x?}\n", resp.as_ref()));
+        if let Some(resp) = crate::response::Response::new(&buf[..len]) {
+            free(|cs| {
+                crate::send_over_uart(&cs, core::format_args!("stm32f4: {:02x?}\n", resp.as_ref()));
             });
-        } else if buf.len() >= 2 && buf[0] == 0x80 && buf[1] == 0x02 {
-            let resp = [0x81, 0x02];
-            self.endpoint_in.write(&resp).unwrap();
-            free(move |cs| {
-                crate::send_over_uart(&cs, core::format_args!("sent: {:02x?}\n", resp.as_ref()));
-            });
-
+            self.endpoint_in.write(resp.as_ref()).unwrap();
         }
-        // } else if buf.len() > 10 {
-        //     let cmd = &buf[10..];
-        //     let resp = [0x80, cmd[0], 0x03];
-        //     self.endpoint_in.write(&resp).unwrap();
-        //     free(move |cs| {
-        //         crate::send_over_uart(&cs, core::format_args!("sent: {:?}\n", resp.as_ref()));
-        //     });
-        // }
     }
-
 }
-
-// impl Hid {
-//     /// Send a USB HID report.
-//     pub fn send_report(&mut self, report: Report) -> usb_device::Result<usize> {
-//         self.endpoint_in.write(report.as_ref())
-//     }
-// }
 
 pub fn interrupt() {
     free(move |cs| {
@@ -275,12 +233,17 @@ pub fn interrupt() {
     });
 }
 
-pub fn send(data: &[u8]) {
+pub fn send() {
     free(move |cs| {
         let mut borrow = USB.borrow(&cs).borrow_mut();
         let usb = &mut borrow.as_mut().unwrap();
-        if let Ok(_) = usb.hid.endpoint_in.write(&data) {
-            crate::send_over_uart(&cs, core::format_args!("sent*: {:02x?}\n", data.as_ref()));
+        let report = crate::response::Response::idle();
+        if let Ok(_) = usb.hid.endpoint_in.write(report.as_ref()) {
+            crate::send_over_uart(
+                &cs,
+                core::format_args!("stm32f4: {:02x?}\n", report.as_ref()),
+            );
+            crate::response::increment_count();
         }
     });
 }
