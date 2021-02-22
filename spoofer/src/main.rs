@@ -2,6 +2,7 @@
 #![no_std]
 
 mod response;
+mod spi;
 mod usb_hid;
 mod vec;
 
@@ -105,7 +106,6 @@ fn main() -> ! {
     }
 
     loop {
-
         // crate::usb_hid::send();
         // delay.delay_ms(100u32);
     }

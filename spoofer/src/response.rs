@@ -1,3 +1,4 @@
+// TODO: https://gist.github.com/mzyy94/60ae253a45e2759451789a117c59acf9#file-simulate_procon-py
 use core::cell::{Cell, RefCell};
 use core::mem;
 
@@ -34,7 +35,10 @@ const SUBCOMMAND_GET_REGULATED_VOLTAGE: u8 = 0x50;
 fn count() -> u8 {
     free(|cs| {
         let counter = COUNTER.borrow(&cs);
-        counter.get()
+        let counter = COUNTER.borrow(&cs);
+        let value = counter.get();
+        counter.set(value.wrapping_add(3));
+        value
     })
 }
 
@@ -191,7 +195,7 @@ impl<'a> UartReply<'a> {
 
 impl AsRef<[u8]> for Response {
     fn as_ref(&self) -> &[u8] {
-        &self.buf[..self.len]
+        &self.buf
     }
 }
 
@@ -207,7 +211,8 @@ impl Response {
                     ])
                     .build(),
                 0x04 => Reply::new(0x30, count()).data(&report()).build(),
-                value => Reply::new(0x81, value).build(),
+                0x02 | 0x03 => Reply::new(0x81, req[1]).build(),
+                _ => return None,
             })
         } else if req.len() > 16 && req[0] == 0x01 {
             let subcommand = req[10];
@@ -232,14 +237,16 @@ impl Response {
                 | SUBCOMMAND_SET_PLAYER_LIGHTS
                 | SUBCOMMAND_SET_HOME_LIGHTS
                 | SUBCOMMAND_ENABLE_IMU
-                | SUBCOMMAND_ENABLE_VIBRATION => {
-                    increment_count();
-                    UartReply::new(0x80, subcommand).build()
+                | SUBCOMMAND_ENABLE_VIBRATION => UartReply::new(0x80, subcommand).build(),
+                SUBCOMMAND_SPI_FLASH_READ => {
+                    let address = u16::from_be_bytes([req[12], req[11]]);
+                    let size = req[15] as usize;
+                    let mut buf = [0u8; 64];
+                    let mut vec = crate::vec::Vec::new(&mut buf);
+                    crate::spi::read(address, &mut vec, size);
+                    UartReply::new(0x90, subcommand).data(vec.as_ref()).build()
                 }
-                SUBCOMMAND_TRIGGER_BUTTONS_ELAPSED_TIME => {
-                    increment_count();
-                    UartReply::new(0x83, subcommand).build()
-                }
+                SUBCOMMAND_TRIGGER_BUTTONS_ELAPSED_TIME => UartReply::new(0x83, subcommand).build(),
                 _ => UartReply::new(0x80, subcommand).build(),
             })
         } else {

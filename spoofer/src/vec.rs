@@ -3,13 +3,18 @@
 use core::str;
 
 pub struct Vec<'s, T> {
-    inner: &'s mut [T],
+    pub inner: &'s mut [T],
     len: usize,
 }
 
 impl<'s, T> Vec<'s, T> {
     pub fn new(inner: &'s mut [T]) -> Self {
         Self { inner, len: 0 }
+    }
+
+    pub fn fake_push(&mut self, value: T) {
+        assert!(self.len < self.inner.len(), "Vec overflow");
+        self.inner[self.len] = value;
     }
 
     pub fn push(&mut self, value: T) {
@@ -24,6 +29,23 @@ impl<'s, T> Vec<'s, T> {
 
     pub fn clear(&mut self) {
         self.len = 0;
+    }
+}
+
+impl<'s, T> Vec<'s, T>
+where
+    T: Copy,
+{
+    pub fn push_slice(&mut self, slice: &[T]) {
+        for element in slice.iter() {
+            self.push(*element);
+        }
+    }
+}
+
+impl<'s> AsRef<[u8]> for Vec<'s, u8> {
+    fn as_ref(&self) -> &[u8] {
+        &self.inner[..self.len]
     }
 }
 

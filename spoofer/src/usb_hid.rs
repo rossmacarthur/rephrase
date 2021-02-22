@@ -230,20 +230,23 @@ pub fn interrupt() {
         let mut borrow = USB.borrow(&cs).borrow_mut();
         let usb = &mut borrow.as_mut().unwrap();
         usb.device.poll(&mut [&mut usb.hid]);
+
+        // let report = crate::response::Response::idle();
+        // usb.hid.endpoint_in.write(report.as_ref()).ok()
     });
 }
 
-pub fn send() {
-    free(move |cs| {
-        let mut borrow = USB.borrow(&cs).borrow_mut();
-        let usb = &mut borrow.as_mut().unwrap();
-        let report = crate::response::Response::idle();
-        if let Ok(_) = usb.hid.endpoint_in.write(report.as_ref()) {
-            crate::send_over_uart(
-                &cs,
-                core::format_args!("stm32f4: {:02x?}\n", report.as_ref()),
-            );
-            crate::response::increment_count();
-        }
-    });
-}
+// pub fn send() {
+//     free(move |cs| {
+//         let mut borrow = USB.borrow(&cs).borrow_mut();
+//         let usb = &mut borrow.as_mut().unwrap();
+//         let report = crate::response::Response::idle();
+//         if let Ok(_) = usb.hid.endpoint_in.write(report.as_ref()) {
+//             crate::send_over_uart(
+//                 &cs,
+//                 core::format_args!("stm32f4: {:02x?}\n", report.as_ref()),
+//             );
+//             // crate::response::increment_count();
+//         }
+//     });
+// }
